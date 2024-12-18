@@ -1,0 +1,78 @@
+<?php
+session_start();
+
+if (!isset($_SESSION['user_id'])) {
+    header("Location: account.php");
+    exit;
+}
+
+//Default username if not set
+$username = isset($_SESSION['username']) ? $_SESSION['username'] : 'Guest';
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800">
+    <!-- Sidebar -->
+    <div class="flex">
+        <div class="w-1/4 bg-gray-800 text-white h-screen p-6">
+            <div class="flex flex-col items-center">
+
+                <!-- Profile Picture -->
+                <div class="w-20 h-20 rounded-full bg-gray-500 mb-4"></div>
+                <h2 class="text-lg font-bold"><?php echo htmlspecialchars($username); ?></h2>
+            </div>
+
+            <!-- Sidebar Links -->
+            <nav class="mt-10">
+                <ul>
+                    <li class="mb-4">
+                        <a href="index.php" class="text-gray-300 hover:text-white">Home</a>
+                    </li>
+                    <li class="mb-4">
+                        <a href="userdashboard.php" class="text-gray-300 hover:text-white">Dashboard</a>
+                    </li>
+                    <li class="mb-4">
+                        <a href="userdashboard.php" class="text-gray-300 hover:text-white">Budget Plan</a>
+                    </li>
+                    <li class="mb-4">
+                        <a href="userdashboard.php" class="text-gray-300 hover:text-white">Expenses</a>
+                    </li>
+                    <li class="mb-4">
+                        <a href="add.php" class="text-gray-300 hover:text-white">Add Product</a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+
+        <!-- Main Content -->
+        <div class="w-3/4 p-6">
+            <h1 class="text-2xl font-bold mb-6">Dashboard</h1>
+
+            <!-- Expenses and Budget Plan -->
+            <div class="grid grid-cols-2 gap-6">
+                <div class="bg-gray-200 p-4 rounded-lg">
+                    <h2 class="text-xl font-bold mb-2">Expenses</h2>
+                    <p class="text-gray-600">Details about your expenses go here (Cart items).</p>
+                </div>
+                <div class="bg-gray-200 p-4 rounded-lg">
+                    <h2 class="text-xl font-bold mb-2">Budget Plan</h2>
+                    <p class="text-gray-600">A detailed budget plan will go here according to the items they have bought previously.</p>
+                </div>
+            </div>
+
+            <!-- Monthly Report -->
+            <div class="bg-gray-800 text-white p-6 rounded-lg mt-6">
+                <h2 class="text-xl font-bold mb-4">Monthly Report</h2>
+                <p>Summary of your monthly financial report goes here.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
