@@ -6,89 +6,135 @@ if (!isset($_SESSION['admin_id'])) {
     header("Location: account.php");
     exit;
 }
+
+// Handle delete request
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_user'])) {
+    $userIdToDelete = $_POST['user_id'];
+
+    // Database connection
+    $conn = mysqli_connect("localhost", "root", "", "user_accounts");
+
+    if ($conn) {
+        $stmt = $conn->prepare("DELETE FROM users WHERE id = ?");
+        $stmt->bind_param("i", $userIdToDelete);
+        $stmt->execute();
+        $stmt->close();
+        $conn->close();
+    }
+
+    header("Location: view_users.php");
+    exit;
+}
+
+// Database connection for chart data
+$con = mysqli_connect("localhost", "root", "", "user_accounts");
+if (!$con) {
+    die("Database connection failed: " . mysqli_connect_error());
+}
 ?>
+
+<?php include('templates/adminpanel.php'); ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 text-gray-800">
-    <!-- Sidebar -->
-    <div class="flex">
-        <div class="w-1/4 bg-gray-800 text-white h-screen p-6">
-            <div class="flex flex-col items-center">
-                <!-- Admin Profile Picture -->
-                <div class="w-20 h-20 rounded-full bg-gray-500 mb-4"></div>
-                <h2 class="text-lg font-bold">Admin</h2>
-            </div>
+    <title>View Users</title>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript">
+        google.charts.load('current', {'packages':['corechart']});
+        google.charts.setOnLoadCallback(drawChart);
 
-            <!-- Sidebar Links -->
-            <nav class="mt-10">
-                <ul>
-                    <li class="mb-4">
-                        <a href="admindashboard.php" class="text-gray-300 hover:text-white">Dashboard</a>
-                    </li>
-                    <li class="mb-4">
-                        <a href="view_users.php" class="text-gray-300 hover:text-white">View Users</a>
-                    </li>
-                    <li class="mb-4">
-                        <a href="manage_products.php" class="text-gray-300 hover:text-white">Manage Products</a>
-                    </li>
-                    <li class="mb-4">
-                        <a href="admindashboard.php" class="text-gray-300 hover:text-white">View Transactions</a>
-                    </li>
-                    <li class="mb-4">
-                        <a href="account.php" class="text-gray-300 hover:text-white">Logout</a>
-                    </li>
-                </ul>
-            </nav>
+        function drawChart() {
+            var data = google.visualization.arrayToDataTable([
+                ['Creation Month', 'Number of Users'],
+                <?php
+                // Fetch data for the chart
+                $chartQuery = "SELECT DATE_FORMAT(created_at, '%Y-%m') AS creation_month, COUNT(*) AS user_count 
+                               FROM users 
+                               GROUP BY creation_month;";
+                $chartResult = mysqli_query($con, $chartQuery);
+
+                if ($chartResult) {
+                    while ($row = mysqli_fetch_assoc($chartResult)) {
+                        echo "['" . $row['creation_month'] . "', " . $row['user_count'] . "],";
+                    }
+                } else {
+                    echo "['No Data', 0],";
+                }
+                ?>
+            ]);
+
+            var options = {
+                title: 'Users Created Per Month',
+                hAxis: {title: 'Month'},
+                vAxis: {title: 'Number of Users'},
+                colors: ['#60A5FA']
+            };
+
+            var chart = new google.visualization.ColumnChart(document.getElementById('userchart'));
+            chart.draw(data, options);
+        }
+    </script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="w-3/4 p-6">
+        <h1 class="text-2xl font-bold mb-4 text-center">Users</h1>
+
+        <!-- User Statistics Chart -->
+        <div class="bg-gray-200 p-4 rounded-lg">
+            <h2 class="text-xl font-bold mb-4">User Statistics</h2>
+            <div id="userchart" style="width: 100%; height: 300px;"></div>
         </div>
 
-        <!-- View Users -->
-        <div class="w-3/4 p-6">
-            <h1 class="text-2xl font-bold mb-4">User List</h1>
+        </br>
+
+        <!-- User Details Table -->
+        <div class="bg-gray-200 p-4 rounded-lg mb-6">
+            <h2 class="text-xl font-bold mb-4">User Details</h2>
             <table class="table-auto w-full bg-white rounded-lg shadow">
                 <thead>
-                    <tr class="bg-gray-200">
-                        <th class="px-4 py-2">Id</th>
-                        <th class="px-4 py-2">Username</th>
-                        <th class="px-4 py-2">Password</th>
+                    <tr class="bg-gray-200 border-b border-gray-300">
+                        <th class="px-4 py-2 text-center border border-gray-300">Id</th>
+                        <th class="px-4 py-2 text-center border border-gray-300">Username</th>
+                        <th class="px-4 py-2 text-center border border-gray-300">Password</th>
+                        <th class="px-4 py-2 text-center border border-gray-300">Created Date</th>
+                        <th class="px-4 py-2 text-center border border-gray-300">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php
-                    // Database connection
-                    $conn = mysqli_connect("localhost", "root", "", "user_accounts");
+                    // Fetch user data for the table
+                    $tableQuery = "SELECT id, username, password, created_at FROM users";
+                    $tableResult = mysqli_query($con, $tableQuery);
 
-                    if (!$conn) {
-                        die("<tr><td colspan='2'>Connection failed: " . mysqli_connect_error() . "</td></tr>");
-                    }
-
-                    $sql = "SELECT id, username, password FROM users"; // SQL Query
-                    $result = $conn->query($sql);
-
-                    if ($result && $result->num_rows > 0) {
-                        // Display user data
-                        while ($row = $result->fetch_assoc()) {
+                    if ($tableResult && mysqli_num_rows($tableResult) > 0) {
+                        while ($row = mysqli_fetch_assoc($tableResult)) {
                             echo "<tr class='border-t'>
-                                    <td class='px-4 py-2'>{$row['id']}</td>
-                                    <td class='px-4 py-2'>{$row['username']}</td>
-                                    <td class='px-4 py-2'>{$row['password']}</td>
-                                  </tr>";
+                                    <td class='px-4 py-2 text-center border border-gray-300'>{$row['id']}</td>
+                                    <td class='px-4 py-2 text-center border border-gray-300'>{$row['username']}</td>
+                                    <td class='px-4 py-2 text-center border border-gray-300'>{$row['password']}</td>
+                                    <td class='px-4 py-2 text-center border border-gray-300'>{$row['created_at']}</td>
+                                    <td class='px-4 py-2 text-center border border-gray-300'>
+                                        <form method='POST' onsubmit='return confirm(\"Are you sure you want to delete this user?\");'>
+                                            <input type='hidden' name='user_id' value='{$row['id']}'>
+                                            <button type='submit' name='delete_user' class='bg-red-500 text-white px-4 py-1 rounded hover:bg-red-600'>
+                                                Delete
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>";
                         }
                     } else {
-                        echo "<tr><td colspan='2' class='text-center py-4'>No users found.</td></tr>";
+                        echo "<tr><td colspan='5' class='text-center py-4'>No users found.</td></tr>";
                     }
-
-                    $conn->close();
                     ?>
                 </tbody>
             </table>
         </div>
+
     </div>
 </body>
 </html>
