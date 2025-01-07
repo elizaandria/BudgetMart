@@ -1,19 +1,26 @@
 <?php
-// signup.php
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
+include('db.php');
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $username = $_POST['username'];
     $email = $_POST['email'];
-    $password = $_POST['password'];
+    $password =$_POST['password'];
 
-    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-    $query = "INSERT INTO users (username, email, password) VALUES ('$username', '$email', '$hashed_password')";
-    
-    if (mysqli_query($conn, $query)) {
-        // Redirect to login page after successful signup
-        header("Location: login.html");
-        exit();
-    } else {
-        echo "Error: " . $query . "<br>" . mysqli_error($conn);
+    $stmt = $conn->prepare("INSERT INTO users (username, email, password) VALUES (:username, :email, :password)");
+    $stmt->bindParam(':username', $username);
+    $stmt->bindParam(':email', $email);
+    $stmt->bindParam(':password', $password);
+
+    try {
+        $stmt->execute();
+        echo "<script>alert('Signup successful!');</script>";
+        header("Location: account.php");
+    } catch (PDOException $e) {
+        if ($e->getCode() == 23000) { // Duplicate entry
+            echo "<script>alert('Username or email already exists');</script>";
+        } else {
+            echo "<script>alert('Something went wrong');</script>";
+        }
     }
 }
 ?>
