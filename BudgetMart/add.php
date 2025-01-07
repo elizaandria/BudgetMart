@@ -2,20 +2,33 @@
 include('db.php');
 session_start();
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+// Redirect to login page if user is not logged in
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login.php");
+    exit();
+}
+
+// Handle Logout
+if (isset($_GET['logout'])) {
+    session_destroy();
+    header("Location: login.php");
+    exit();
+}
+
+// Handle Add Product
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && !isset($_POST['delete'])) {
     // Initialize variables and handle missing fields
     $name = isset($_POST['name']) ? trim($_POST['name']) : null;
     $description = isset($_POST['description']) ? trim($_POST['description']) : null;
     $price = isset($_POST['price']) ? trim($_POST['price']) : null;
-    $user_id = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : null;
+    $category = isset($_POST['category']) ? trim($_POST['category']) : null;
+    $user_id = $_SESSION['user_id'];
 
-    if (empty($name) || empty($price)) {
-        echo "<p style='color: red;'>Product name and price are required.</p>";
-    } elseif (!$user_id) {
-        echo "<p style='color: red;'>You must be logged in to add a product.</p>";
+    if (empty($name) || empty($price) || empty($category)) {
+        echo "<p style='color: red;'>Product name, price, and category are required.</p>";
     } else {
         // Handle Image Upload
-        $image = null; // Default value for image
+        $image = null;
         if (!empty($_FILES['image']['name'])) {
             $target_dir = "uploads/";
             if (!file_exists($target_dir)) {
@@ -25,20 +38,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $image = basename($_FILES['image']['name']);
             $target_file = $target_dir . $image;
 
-            // Validate and move the uploaded file
             if (!move_uploaded_file($_FILES['image']['tmp_name'], $target_file)) {
                 $image = null; // If upload fails, set image to null
             }
         }
 
         // Insert product data into the database
-        $sql = "INSERT INTO products (name, description, price, image, user_id) 
-                VALUES (:name, :description, :price, :image, :user_id)";
+        $sql = "INSERT INTO products (name, description, price, image, category, user_id) 
+                VALUES (:name, :description, :price, :image, :category, :user_id)";
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':name', $name);
         $stmt->bindParam(':description', $description);
         $stmt->bindParam(':price', $price);
         $stmt->bindParam(':image', $image);
+        $stmt->bindParam(':category', $category);
         $stmt->bindParam(':user_id', $user_id);
 
         try {
@@ -53,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// Delete functionality
+// Handle Delete Product
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['delete'])) {
     $product_id = isset($_POST['product_id']) ? $_POST['product_id'] : null;
 
@@ -72,54 +85,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['delete'])) {
 }
 
 // Fetch all products for the logged-in user
-$user_id = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : null;
-if ($user_id) {
-    $sql = "SELECT id, name, description, price, image FROM products WHERE user_id = :user_id";
-    $stmt = $conn->prepare($sql);
-    $stmt->bindParam(':user_id', $user_id);
-    $stmt->execute();
-    $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} else {
-    $products = [];
-    echo "<p style='color: red;'>Please log in to view your products.</p>";
-}
+$user_id = $_SESSION['user_id'];
+$sql = "SELECT id, name, description, price, image, category FROM products WHERE user_id = :user_id";
+$stmt = $conn->prepare($sql);
+$stmt->bindParam(':user_id', $user_id);
+$stmt->execute();
+$products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
+<?php include('templates/userpanel.php'); ?>
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 text-gray-800">
-    <!-- Sidebar -->
-    <div class="flex">
-        <div class="w-1/4 bg-gray-800 text-white h-screen p-6">
-            <div class="flex flex-col items-center">
-                <!-- Profile Picture -->
-                <div class="w-20 h-20 rounded-full bg-gray-500 mb-4"></div>
-                <h2 class="text-lg font-bold">Account Owner's Name</h2>
-            </div>
-            <!-- Sidebar Links -->
-            <nav class="mt-10">
-                <ul>
-                    <li class="mb-4"><a href="index.php" class="text-gray-300 hover:text-white">Home</a></li>
-                    <li class="mb-4"><a href="userdashboard.php" class="text-gray-300 hover:text-white">Dashboard</a></li>
-                    <li class="mb-4"><a href="userdashboard.php" class="text-gray-300 hover:text-white">Budget Plan</a></li>
-                    <li class="mb-4"><a href="userdashboard.php" class="text-gray-300 hover:text-white">Expenses</a></li>
-                    <li class="mb-4"><a href="add.php" class="text-gray-300 hover:text-white">Add Product</a></li>
-                </ul>
-            </nav>
-        </div>
-
-        <!-- Main Content -->
         <div class="w-3/4 p-6">
             <h1 class="text-2xl font-bold mb-6">Dashboard</h1>
-
-            <!-- Add Product Form -->
             <div class="bg-white p-6 rounded-lg shadow-lg mb-6">
                 <h2 class="text-xl font-bold mb-4">Add Product</h2>
                 <form action="" method="POST" enctype="multipart/form-data">
@@ -136,6 +113,17 @@ if ($user_id) {
                         <input type="number" name="price" class="w-full border border-gray-300 p-2 rounded" step="0.01" required>
                     </div>
                     <div class="mb-4">
+                        <label class="block mb-2 font-semibold">Category</label>
+                        <select name="category" class="w-full border border-gray-300 p-2 rounded" required>
+                            <option value="" disabled selected>Select a category</option>
+                            <option value="electronics">Electronics</option>
+                            <option value="sports">Sports</option>
+                            <option value="clothes">Clothes</option>
+                            <option value="kids">Kids</option>
+                            <option value="furniture">Furniture</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
                         <label class="block mb-2 font-semibold">Image</label>
                         <input type="file" name="image" class="w-full border border-gray-300 p-2 rounded" accept="image/*">
                     </div>
@@ -143,7 +131,6 @@ if ($user_id) {
                 </form>
             </div>
 
-            <!-- Product List -->
             <div class="bg-gray-200 p-6 rounded-lg shadow-lg">
                 <h2 class="text-xl font-bold mb-4">Your Products</h2>
                 <table class="w-full border-collapse border border-gray-300 bg-white rounded-lg">
@@ -153,7 +140,8 @@ if ($user_id) {
                             <th class="p-3 border border-gray-300">Description</th>
                             <th class="p-3 border border-gray-300">Price</th>
                             <th class="p-3 border border-gray-300">Image</th>
-                            <th class="p-3 border border-gray-300">Actions</th>
+                            <th class="p-3 border border-gray-300">Category</th>
+                            <th class="p-3 border border-gray-300">Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -164,13 +152,14 @@ if ($user_id) {
                                     <td class="p-3 border border-gray-300"><?php echo htmlspecialchars($product['description']); ?></td>
                                     <td class="p-3 border border-gray-300">Rs.<?php echo number_format($product['price'], 2); ?></td>
                                     <td class="p-3 border border-gray-300">
-                                        <?php if (!empty($product['image'])): ?>
+                                        <?php if (!empty($product['image'])): ?> 
                                             <img src="uploads/<?php echo htmlspecialchars($product['image']); ?>" 
                                                  alt="Product Image" class="w-16 h-16 object-cover rounded">
                                         <?php else: ?>
                                             No Image
                                         <?php endif; ?>
                                     </td>
+                                    <td class="p-3 border border-gray-300"><?php echo htmlspecialchars($product['category']); ?></td>
                                     <td class="p-3 border border-gray-300">
                                         <form action="" method="POST">
                                             <input type="hidden" name="product_id" value="<?php echo $product['id']; ?>">
@@ -181,7 +170,7 @@ if ($user_id) {
                             <?php endforeach; ?>
                         <?php else: ?>
                             <tr>
-                                <td colspan="5" class="p-3 text-center border border-gray-300">No products found.</td>
+                                <td colspan="6" class="p-3 text-center border border-gray-300">No products found.</td>
                             </tr>
                         <?php endif; ?>
                     </tbody>
